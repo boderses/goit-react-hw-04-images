@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import Searchbar from './Searchbar/Searchbar';
 import ImageGallery from './ImageGallery/ImageGallery';
 import { getGalleryData } from './API/Api';
@@ -7,56 +7,83 @@ import { Gallery } from './ImageGallery/ImageGallery.styled';
 import { GalleryNotification } from './ImageGallery/ImageGallery.styled';
 import Button from './Button/Button';
 import Loader from './Loader/Loader';
+import { Modal } from './Modal/Modal';
 
-export class App extends Component {
-  state = {
-    images: [],
+export const App = () => {
+  const [state, setState] = useState({
     query: '',
+    page: 0,
+    images: [],
     loading: false,
     error: null,
-    page: 1,
-    total: 1,
-  };
+    lastPage: true,
+  });
 
-  async componentDidUpdate(prevProps, prevState) {
-    if (prevState.query !== this.state.query) {
-      this.getImages();
-    }
+  const [images, setImages] = useState([]);
 
-    if (
-      prevState.page !== this.state.page &&
-      prevState.query === this.state.query
-    ) {
-      this.getImages();
-    }
-    this.scrollPage();
-  }
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  searchImage = query => {
-    this.setState({
-      loading: true,
-      query: query,
-      error: null,
-      images: [],
-      page: 1,
-    });
-  };
+  const [image, setImage] = useState({});
 
-  loadMore = () => {
-    this.setState(prevState => ({ page: prevState.page + 1 }));
-  };
+  const onSubmitRef = useRef(null);
 
-  async getImages() {
-    await getGalleryData(this.state.query, this.state.page)
-      .then(result => {
-        const newImages = [...this.state.images, ...result.images];
-        this.setState({ images: newImages, total: result.total });
-      })
-      .catch(error => this.setState({ error: error }))
-      .finally(() => this.setState({ loading: false }));
-  }
+  const toggleModal = useCallback(
+    (image = {}) => {
+      setImage(image);
 
-  scrollPage() {
+      setIsModalOpen(prevState => !prevState);
+    },
+    [setIsModalOpen, setImage]
+  );
+
+  const getImages = useCallback(
+    searchTerm => {
+      const query = searchTerm === undefined ? state.query : searchTerm;
+      const page = searchTerm === undefined ? state.page + 1 : 1;
+
+      setState({ query, loading: true, error: null, images: [], page });
+
+      getGalleryData(query, page)
+        .then(result => {
+          setState({
+            query,
+            images: result.images,
+            error: null,
+            loading: false,
+            page,
+            lastPage: page === result.total,
+          });
+          setImages(page === 1 ? result.images : [...images, ...result.images]);
+        })
+        .catch(error => {
+          setState({ query, error, loading: false, images: [], page });
+          setImages([]);
+        });
+    },
+    [images, state, setState, setImages]
+  );
+
+  const searchImage = useCallback(
+    query => {
+      getImages(query);
+    },
+    [getImages]
+  );
+
+  onSubmitRef.current = searchImage;
+
+  const loadMore = useCallback(() => {
+    getImages();
+  }, [getImages]);
+
+  const onSubmit = useCallback(
+    query => {
+      onSubmitRef.current(query);
+    },
+    [onSubmitRef]
+  );
+
+  const scrollPage = () => {
     const { height: cardHeight } = document
       .querySelector('#gallery')
       .firstElementChild.getBoundingClientRect();
@@ -65,27 +92,37 @@ export class App extends Component {
       top: cardHeight,
       behavior: 'smooth',
     });
-  }
+  };
 
-  render() {
-    const { images, total } = this.state;
+  useEffect(() => {
+    scrollPage();
+  }, [state]);
 
-    return (
-      <>
-        <Searchbar onSubmit={this.searchImage} />
-        <Gallery id="gallery">
-          {this.state.loading && <Loader />}
-          {this.state.error && (
-            <GalleryNotification>
-              Sorry...{this.state.error}
-            </GalleryNotification>
-          )}
-          <ImageGallery images={images} />
-          {this.state.page < total && !this.state.error && (
-            <Button clickHandle={this.loadMore}>load more</Button>
-          )}
-        </Gallery>
-      </>
-    );
-  }
-}
+  return (
+    <>
+      <Searchbar onSubmit={onSubmit} />
+      <Gallery id="gallery">
+        {state.loading && <Loader />}
+        {state.error && (
+          <GalleryNotification>Sorry...{state.error}</GalleryNotification>
+        )}
+        <ImageGallery images={images} modalHandler={toggleModal} />
+        {!state.lastPage && !state.error && !state.loading && (
+          <Button
+            disabled={state.loading || state.error}
+            clickHandle={loadMore}
+          >
+            load more
+          </Button>
+        )}
+        {isModalOpen && (
+          <Modal
+            src={image.largeImageURL}
+            alt={image.tags}
+            onClose={toggleModal}
+          />
+        )}
+      </Gallery>
+    </>
+  );
+};
