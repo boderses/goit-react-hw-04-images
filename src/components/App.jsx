@@ -19,8 +19,6 @@ export const App = () => {
     lastPage: true,
   });
 
-  const [images, setImages] = useState([]);
-
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [image, setImage] = useState({});
@@ -47,20 +45,19 @@ export const App = () => {
         .then(result => {
           setState({
             query,
-            images: result.images,
+            images:
+              page === 1 ? result.images : [...state.images, ...result.images],
             error: null,
             loading: false,
             page,
             lastPage: page === result.total,
           });
-          setImages(page === 1 ? result.images : [...images, ...result.images]);
         })
         .catch(error => {
           setState({ query, error, loading: false, images: [], page });
-          setImages([]);
         });
     },
-    [images, state, setState, setImages]
+    [state, setState]
   );
 
   const searchImage = useCallback(
@@ -106,7 +103,7 @@ export const App = () => {
         {state.error && (
           <GalleryNotification>Sorry...{state.error}</GalleryNotification>
         )}
-        <ImageGallery images={images} modalHandler={toggleModal} />
+        <ImageGallery images={state.images} />
         {!state.lastPage && !state.error && !state.loading && (
           <Button
             disabled={state.loading || state.error}
