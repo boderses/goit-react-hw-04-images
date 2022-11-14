@@ -7,7 +7,6 @@ import { Gallery } from './ImageGallery/ImageGallery.styled';
 import { GalleryNotification } from './ImageGallery/ImageGallery.styled';
 import Button from './Button/Button';
 import Loader from './Loader/Loader';
-import { Modal } from './Modal/Modal';
 
 export const App = () => {
   const [state, setState] = useState({
@@ -19,20 +18,7 @@ export const App = () => {
     lastPage: true,
   });
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const [image, setImage] = useState({});
-
   const onSubmitRef = useRef(null);
-
-  const toggleModal = useCallback(
-    (image = {}) => {
-      setImage(image);
-
-      setIsModalOpen(prevState => !prevState);
-    },
-    [setIsModalOpen, setImage]
-  );
 
   const getImages = useCallback(
     searchTerm => {
@@ -111,13 +97,6 @@ export const App = () => {
           >
             load more
           </Button>
-        )}
-        {isModalOpen && (
-          <Modal
-            src={image.largeImageURL}
-            alt={image.tags}
-            onClose={toggleModal}
-          />
         )}
       </Gallery>
     </>
